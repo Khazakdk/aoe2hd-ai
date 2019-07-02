@@ -1,26 +1,112 @@
 ;Author: Joe Sommer
 ;This AI is being built as a learning exercise, following along with BearTheGreat's training example
 
+; begin defconsts
+(defconst g-age-status 1) ;Goal 1
+(defconst gv-dark-age 0)
+(defconst gv-advancing-to-feudal 1)
+(defconst gv-feudal-age 2)
+(defconst gv-advancing-to-castle 3)
+(defconst gv-castle-age 4)
+(defconst gv-advancing-to-imperial 5)
+(defconst gv-imperial-age 6)
+; end defconsts
+
+; initialize age goal
+(defrule
+   (true)
+   =>
+   (set-goal g-age-status gv-dark-age)
+   (disable-self)
+)
 
 ; make sure to add age up rules
+; new is adding checks in case age up misfires
+(defrule                                      ;New in Training2
+   (goal g-age-status gv-advancing-to-feudal)
+   (research-available feudal-age)
+   =>
+   (chat-to-allies "Age research misfire!")
+   (set-goal g-age-status gv-dark-age)
+)
+
 (defrule
    (can-research feudal-age)
    =>
    (research feudal-age)
+   (set-goal g-age-status gv-advancing-to-feudal) ;New in Training2
+   (chat-to-allies "Researching Feudal Age")      ;New in Training2
+)
+
+(defrule                        ;New in Training2
+   (current-age == feudal-age)
+   =>
+   (set-goal g-age-status gv-feudal-age)
+   (disable-self)
+)
+
+(defrule                                      ;New in Training2
+   (goal g-age-status gv-advancing-to-castle)
+   (research-available castle-age)
+   =>
+   (chat-to-allies "Age research misfire!")
+   (set-goal g-age-status gv-feudal-age)
 )
 
 (defrule
    (can-research castle-age)
    =>
    (research castle-age)
+   (set-goal g-age-status gv-advancing-to-castle) ;New in Training2
+   (chat-to-allies "Researching Castle Age")      ;New in Training2
+)
+
+(defrule                       ;New in Training2
+   (current-age == castle-age)
+   =>
+   (set-goal g-age-status gv-castle-age)
+   (disable-self)
+)
+
+(defrule                                        ;New in Training2
+   (goal g-age-status gv-advancing-to-imperial)
+   (research-available imperial-age)
+   =>
+   (chat-to-allies "Age research misfire!")
+   (set-goal g-age-status gv-castle-age)
 )
 
 (defrule
    (can-research imperial-age)
    =>
    (research imperial-age)
+   (set-goal g-age-status gv-advancing-to-imperial) ;New in Training2
+   (chat-to-allies "Researching Imperial Age")      ;New in Training2
+)
+
+(defrule                         ;New in Training2
+   (current-age == imperial-age)
+   =>
+   (set-goal g-age-status gv-imperial-age)
+   (disable-self)
 )
 ; end age up rules
+
+
+(defrule
+   (true)
+   =>
+   (set-strategic-number sn-initial-exploration-required 0) ; default 100
+   (set-strategic-number sn-food-dropsite-distance -1) ; default 7
+   (set-strategic-number sn-wood-dropsite-distance -1) ; default 10
+;Next two strategic numbers are set to try to get first mining camp at gold.
+;Like many things in the game, it is not 100%, but I would say it works over 
+;90% of the time.
+   (set-strategic-number sn-stone-dropsite-distance 100) ; default 25
+   (set-strategic-number sn-gold-dropsite-distance 35) ; default 7
+   (disable-self)
+)
+; end setup
 
 ; train villagers and build houses, basic stuff we do all game
 (defrule
@@ -39,10 +125,40 @@
 )
 ; end basic
 
+; begin set economy rules
+(defrule
+   (goal g-age-status gv-dark-age) ;New in Training2
+   =>
+   (set-strategic-number sn-food-gatherer-percentage 60)
+   (set-strategic-number sn-wood-gatherer-percentage 40)
+   (set-strategic-number sn-gold-gatherer-percentage 0)
+   (set-strategic-number sn-stone-gatherer-percentage 0)
+)
+
+(defrule
+   (goal g-age-status gv-advancing-to-feudal)  ;New in Training2
+   =>
+   (set-strategic-number sn-food-gatherer-percentage 40)
+   (set-strategic-number sn-wood-gatherer-percentage 50)
+   (set-strategic-number sn-gold-gatherer-percentage 10)
+   (set-strategic-number sn-stone-gatherer-percentage 0)
+)
+
+(defrule
+   (goal g-age-status gv-advancing-to-castle)  ;New in Training2
+   =>
+   (set-strategic-number sn-food-gatherer-percentage 40)
+   (set-strategic-number sn-wood-gatherer-percentage 35)
+   (set-strategic-number sn-gold-gatherer-percentage 20)
+   (set-strategic-number sn-stone-gatherer-percentage 5)
+)
+; end economy rules
+
 ;The default strategic numbers are not working for us.  Let's force no civilian
 ;explorers after the berries are found.  We still want our scout to explore.
 
 
+; doesnt account for when we haven't found food (may need to revisit)
 (defrule
    (resource-found food)
    =>
@@ -51,25 +167,12 @@
    (set-strategic-number sn-cap-civilian-explorers 0) ;default 2
    (set-strategic-number sn-number-explore-groups 1) ; default 0, should let our scout go scout
    (set-strategic-number sn-maximum-explore-group-size 1) ; default 3
-   (set-strategic-number sn-initial-exploration-required 0) ; default 100
+   (set-strategic-number sn-camp-max-distance 35) ; default 25
    (disable-self)
 )
 
-;So far so good.  We need 2 Dark Age buildings and 500 food to advance to the
-;Feudal Age.  There are absolutely refinements that can be made to the
-;following rule, but for now let's keep it simple.  Let's say we want 60% of
-;our villagers on food and 40% on wood.
 
-(defrule
-   (current-age == dark-age)
-   =>
-   (chat-local-to-self "starting dark age allocations")
-   (set-strategic-number sn-food-gatherer-percentage 60)
-   (set-strategic-number sn-wood-gatherer-percentage 40)
-   (set-strategic-number sn-gold-gatherer-percentage 0)
-   (set-strategic-number sn-stone-gatherer-percentage 0)
-)
-
+; start build rules
 (defrule
    (building-type-count-total house > 0) ;Start first house before mill.
    (building-type-count-total mill < 1)
@@ -101,3 +204,56 @@
    =>
    (build farm)
 )
+
+(defrule
+   (or(current-age > dark-age)
+      (goal g-age-status gv-advancing-to-feudal))  ;New in Training2
+   (idle-farm-count == 0)
+   (can-build farm)
+   =>
+   (build farm)
+)
+
+;; not from training2 - special rules to make sure we age up
+(defrule
+	(can-build barracks)
+	(building-type-count-total barracks < 1)
+	=>
+	(build barracks)
+)
+
+(defrule
+	(can-build archery-range)
+	(building-type-count-total archery-range < 1)
+	=>
+	(build archery-range)
+)
+
+(defrule
+	(can-build stable)
+	(building-type-count-total stable < 1)
+	=>
+	(build stable)
+)
+
+(defrule
+	(can-build archery-range)
+	(building-type-count-total archery-range < 1)
+	=>
+	(build archery-range)
+)
+
+(defrule
+	(can-build monastery)
+	(building-type-count-total monastery < 1)
+	=>
+	(build monastery)
+)
+
+(defrule
+	(can-build university)
+	(building-type-count-total university < 1)
+	=>
+	(build university)
+)
+;; end special age up rules
